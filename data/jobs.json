@@ -1,0 +1,43 @@
+[
+  {
+    "id": "job-1761068455566-moe532eqs",
+    "title": "Consultant CRM Salesforce",
+    "location": "Casablanca",
+    "type": "CDI",
+    "department": "Casablanca",
+    "summary": "Consultant CRM Salesforce avec au moins deux ans d'xp",
+    "requirements": [
+      "Salesforce",
+      "DBA",
+      "SQL",
+      "ERP"
+    ],
+    "missions": [
+      " CRM Salesforce chez client bancaire"
+    ],
+    "applyEmail": "edsanas11@gmail.com",
+    "published": true,
+    "order": 2,
+    "createdAt": "2025-10-21T17:40:55.566Z",
+    "updatedAt": "2025-10-21T17:40:55.567Z"
+  },
+  {
+    "id": "job-1761069005926-35hul19aq",
+    "title": "Consultant IA",
+    "location": "Marrakech",
+    "type": "CDD",
+    "department": "75",
+    "summary": "IA",
+    "requirements": [
+      "ML LLM"
+    ],
+    "missions": [
+      "data lake"
+    ],
+    "applyEmail": "edsanas11@gmail.com",
+    "published": true,
+    "order": -2,
+    "createdAt": "2025-10-21T17:50:05.926Z",
+    "updatedAt": "2025-10-21T17:50:05.926Z"
+  }
+]
