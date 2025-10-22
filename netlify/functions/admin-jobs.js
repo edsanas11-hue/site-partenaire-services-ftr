@@ -1,4 +1,4 @@
-const { loadJobs, saveJobs } = require('./jobs-storage');
+const { loadJobs, saveJobs } = require('./supabase-jobs');
 
 console.log("=== ADMIN JOBS FUNCTION START ===");
 console.log("Environment variables:", {
@@ -44,7 +44,7 @@ exports.handler = async (event) => {
   try {
     if (event.httpMethod === 'GET') {
       console.log("Loading jobs...");
-      const jobs = loadJobs();
+      const jobs = await loadJobs();
       console.log("Jobs loaded:", jobs.length);
       
       return {
@@ -58,7 +58,7 @@ exports.handler = async (event) => {
       const jobData = JSON.parse(event.body);
       console.log("Creating job:", jobData);
       
-      const jobs = loadJobs();
+      const jobs = await loadJobs();
       const newJob = {
         ...jobData,
         id: Date.now().toString(),
@@ -66,7 +66,7 @@ exports.handler = async (event) => {
       };
       
       jobs.push(newJob);
-      saveJobs(jobs);
+      await saveJobs(jobs);
       
       console.log("Job created successfully");
       return {
@@ -80,7 +80,7 @@ exports.handler = async (event) => {
       const { id, ...jobData } = JSON.parse(event.body);
       console.log("Updating job:", id, jobData);
       
-      const jobs = loadJobs();
+      const jobs = await loadJobs();
       const jobIndex = jobs.findIndex(job => job.id === id);
       
       if (jobIndex === -1) {
@@ -91,7 +91,7 @@ exports.handler = async (event) => {
       }
       
       jobs[jobIndex] = { ...jobs[jobIndex], ...jobData };
-      saveJobs(jobs);
+      await saveJobs(jobs);
       
       console.log("Job updated successfully");
       return {
@@ -105,9 +105,9 @@ exports.handler = async (event) => {
       const { id } = JSON.parse(event.body);
       console.log("Deleting job:", id);
       
-      const jobs = loadJobs();
+      const jobs = await loadJobs();
       const filteredJobs = jobs.filter(job => job.id !== id);
-      saveJobs(filteredJobs);
+      await saveJobs(filteredJobs);
       
       console.log("Job deleted successfully");
       return {
