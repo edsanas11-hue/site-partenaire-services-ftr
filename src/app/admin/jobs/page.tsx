@@ -125,14 +125,17 @@ export default function AdminJobsPage() {
 
       const data = await response.json();
 
-      if (data.success) {
+      // Considérer toute réponse contenant un 'id' comme succès
+      if (data && data.id) {
         toast.success(editingJob ? 'Offre mise à jour' : 'Offre créée');
         setShowForm(false);
         setEditingJob(null);
         resetForm();
         loadJobs();
-      } else {
+      } else if (data.error) {
         toast.error(data.error || 'Erreur lors de la sauvegarde');
+      } else {
+        toast.error('Erreur lors de la sauvegarde');
       }
     } catch (error) {
       toast.error('Erreur lors de la sauvegarde');
