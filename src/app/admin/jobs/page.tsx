@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Plus, 
@@ -79,7 +79,7 @@ export default function AdminJobsPage() {
   };
 
   // Charger les offres
-  const loadJobs = async () => {
+  const loadJobs = useCallback(async () => {
     try {
       const response = await fetch('/.netlify/functions/admin-jobs', {
         headers: { 'Authorization': `Bearer ${adminToken}` }
@@ -89,7 +89,7 @@ export default function AdminJobsPage() {
     } catch (error) {
       toast.error('Erreur lors du chargement des offres');
     }
-  };
+  }, [adminToken]);
 
   // Charger les offres quand l'utilisateur est authentifié
   useEffect(() => {

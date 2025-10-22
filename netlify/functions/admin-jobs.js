@@ -24,11 +24,13 @@ exports.handler = async (event) => {
   }
 
   const token = authHeader.replace('Bearer ', '');
-  console.log("Token:", token);
+  console.log("Token reçu:", token);
+  console.log("ADMIN_PASSWORD attendu:", process.env.ADMIN_PASSWORD);
+  console.log("Tokens identiques:", token === process.env.ADMIN_PASSWORD);
   
   // Le token est le mot de passe admin lui-même
   if (token !== process.env.ADMIN_PASSWORD) {
-    console.log("Invalid token");
+    console.log("Invalid token - comparaison échouée");
     return {
       statusCode: 401,
       body: JSON.stringify({ error: "Token invalide" })
