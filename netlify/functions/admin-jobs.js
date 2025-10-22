@@ -1,4 +1,4 @@
-const { loadJobs, saveJobs } = require('../../src/lib/jobs-storage');
+const { loadJobs, saveJobs } = require('./jobs-storage');
 
 console.log("=== ADMIN JOBS FUNCTION START ===");
 console.log("Environment variables:", {
