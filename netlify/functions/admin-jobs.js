@@ -26,6 +26,7 @@ exports.handler = async (event) => {
   const token = authHeader.replace('Bearer ', '');
   console.log("Token:", token);
   
+  // Le token est le mot de passe admin lui-même
   if (token !== process.env.ADMIN_PASSWORD) {
     console.log("Invalid token");
     return {

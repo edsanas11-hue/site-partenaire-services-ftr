@@ -96,7 +96,7 @@ export default function AdminJobsPage() {
     if (isAuthenticated && adminToken) {
       loadJobs();
     }
-  }, [isAuthenticated, adminToken]);
+  }, [isAuthenticated, adminToken, loadJobs]);
 
   // Sauvegarder une offre
   const saveJob = async (e: React.FormEvent) => {
