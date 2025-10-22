@@ -3,6 +3,12 @@ const { createClient } = require('@supabase/supabase-js');
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_ANON_KEY;
 
+console.log("=== SUPABASE CONFIG DEBUG ===");
+console.log("SUPABASE_URL:", supabaseUrl ? "SET" : "NOT SET");
+console.log("SUPABASE_ANON_KEY:", supabaseKey ? "SET" : "NOT SET");
+console.log("URL value:", supabaseUrl);
+console.log("Key value:", supabaseKey ? supabaseKey.substring(0, 20) + "..." : "NOT SET");
+
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function loadJobs() {
