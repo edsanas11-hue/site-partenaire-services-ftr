@@ -8,21 +8,54 @@ console.log("Environment variables:", {
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+// Fonction pour parser multipart/form-data (texte uniquement)
+function parseMultipartFormData(body, boundary) {
+  const parts = body.split(`--${boundary}`);
+  const formData = {};
+
+  for (const part of parts) {
+    if (part.includes('Content-Disposition: form-data')) {
+      const lines = part.split('\r\n');
+      const disposition = lines.find(line => line.includes('Content-Disposition'));
+      if (disposition) {
+        const nameMatch = disposition.match(/name="([^"]+)"/);
+        if (nameMatch) {
+          const fieldName = nameMatch[1];
+          const value = lines[lines.length - 2]; // ligne avant vide
+          formData[fieldName] = value;
+        }
+      }
+    }
+  }
+  return formData;
+}
+
 exports.handler = async (event) => {
   console.log("=== SEND CONTACT HANDLER START ===");
   console.log("Event method:", event.httpMethod);
-  console.log("Event body:", event.body);
-  
+  console.log("Event headers:", event.headers);
+  console.log("Event body type:", typeof event.body);
+  console.log("Event body length:", event.body ? event.body.length : 0);
+
   if (event.httpMethod !== "POST") {
     console.log("Method not allowed:", event.httpMethod);
     return { statusCode: 405, body: "Method Not Allowed" };
   }
-
   try {
-    const formData = JSON.parse(event.body);
+    let formData;
+    const contentType = event.headers['content-type'] || event.headers['Content-Type'];
+    console.log("Content-Type:", contentType);
+    if (contentType && contentType.includes('multipart/form-data')) {
+      console.log("Parsing multipart/form-data");
+      const boundary = contentType.split('boundary=')[1];
+      console.log("Boundary:", boundary);
+      formData = parseMultipartFormData(event.body, boundary);
+    } else {
+      console.log("Parsing JSON");
+      formData = JSON.parse(event.body);
+    }
     console.log("Parsed form data:", formData);
     const { firstName, lastName, email, phone, company, position, service, projectType } = formData;
-
     const emailHtml = `
       <h1>Nouveau message de contact reçu</h1>
       <p><strong>Nom:</strong> ${firstName} ${lastName}</p>
@@ -33,21 +66,17 @@ exports.handler = async (event) => {
       <p><strong>Service intéressé:</strong> ${service}</p>
       <p><strong>Type de projet:</strong> ${projectType}</p>
     `;
-
     console.log("Attempting to send email...");
     console.log("From: onboarding@resend.dev");
     console.log("To:", process.env.DESTINATION_EMAIL);
     console.log("Subject:", `Nouveau message de contact - ${firstName} ${lastName}`);
-    
     const emailResult = await resend.emails.send({
       from: 'onboarding@resend.dev',
       to: process.env.DESTINATION_EMAIL,
       subject: `Nouveau message de contact - ${firstName} ${lastName}`,
       html: emailHtml
     });
-    
     console.log("Email sent successfully:", emailResult);
-
     return {
       statusCode: 200,
       body: JSON.stringify({ success: true, message: "Message envoyé avec succès" })
