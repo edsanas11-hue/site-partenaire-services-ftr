@@ -103,7 +103,9 @@ export default function CareersPage() {
   useEffect(() => {
     const loadJobs = async () => {
       try {
-        const response = await fetch('/api/jobs');
+        const isNetlify = typeof window !== "undefined" && window.location.hostname.endsWith("netlify.app");
+        const apiUrl = isNetlify ? "/.netlify/functions/public-jobs" : "/api/jobs";
+        const response = await fetch(apiUrl);
         const data = await response.json();
         const jobsArr = Array.isArray(data) ? data : (data.jobs || []);
         setOpenPositions(jobsArr);
