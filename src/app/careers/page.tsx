@@ -105,7 +105,8 @@ export default function CareersPage() {
       try {
         const response = await fetch('/api/jobs');
         const data = await response.json();
-        setOpenPositions(data.jobs || []);
+        const jobsArr = Array.isArray(data) ? data : (data.jobs || []);
+        setOpenPositions(jobsArr);
       } catch (error) {
         console.error('Erreur lors du chargement des offres:', error);
         // En cas d'erreur, utiliser des données par défaut

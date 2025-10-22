@@ -85,7 +85,8 @@ export default function AdminJobsPage() {
         headers: { 'Authorization': `Bearer ${adminToken}` }
       });
       const data = await response.json();
-      setJobs(data.jobs || []);
+      const jobsArr = Array.isArray(data) ? data : (data.jobs || []);
+      setJobs(jobsArr);
     } catch (error) {
       toast.error('Erreur lors du chargement des offres');
     }
