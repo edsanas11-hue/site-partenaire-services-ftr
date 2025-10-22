@@ -13,7 +13,11 @@ exports.handler = async (event) => {
 
   // Vérification de l'authentification
   const authHeader = event.headers.authorization || event.headers.Authorization;
+  console.log("=== AUTH DEBUG ===");
+  console.log("All headers:", JSON.stringify(event.headers, null, 2));
   console.log("Auth header:", authHeader);
+  console.log("Headers authorization:", event.headers.authorization);
+  console.log("Headers Authorization:", event.headers.Authorization);
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     console.log("No valid auth header found");
