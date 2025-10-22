@@ -81,8 +81,8 @@ export default function AdminJobsPage() {
   // Charger les offres
   const loadJobs = async () => {
     try {
-      const response = await fetch('/api/admin/jobs', {
-        headers: { 'x-admin-token': adminToken }
+      const response = await fetch('/.netlify/functions/admin-jobs', {
+        headers: { 'Authorization': `Bearer ${adminToken}` }
       });
       const data = await response.json();
       setJobs(data.jobs || []);
@@ -111,16 +111,16 @@ export default function AdminJobsPage() {
         order: parseInt(formData.order.toString()) || 0
       };
 
-      const url = editingJob ? `/api/admin/jobs/${editingJob.id}` : '/api/admin/jobs';
+      const url = '/.netlify/functions/admin-jobs';
       const method = editingJob ? 'PUT' : 'POST';
 
       const response = await fetch(url, {
         method,
         headers: { 
           'Content-Type': 'application/json',
-          'x-admin-token': adminToken
+          'Authorization': `Bearer ${adminToken}`
         },
-        body: JSON.stringify(jobData)
+        body: JSON.stringify(editingJob ? { id: editingJob.id, ...jobData } : jobData)
       });
 
       const data = await response.json();
@@ -146,9 +146,13 @@ export default function AdminJobsPage() {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cette offre ?')) return;
 
     try {
-      const response = await fetch(`/api/admin/jobs/${id}`, {
+      const response = await fetch('/.netlify/functions/admin-jobs', {
         method: 'DELETE',
-        headers: { 'x-admin-token': adminToken }
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminToken}` 
+        },
+        body: JSON.stringify({ id })
       });
 
       const data = await response.json();
@@ -167,13 +171,13 @@ export default function AdminJobsPage() {
   // Toggle publication
   const togglePublication = async (job: JobOffer) => {
     try {
-      const response = await fetch(`/api/admin/jobs/${job.id}`, {
+      const response = await fetch('/.netlify/functions/admin-jobs', {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
-          'x-admin-token': adminToken
+          'Authorization': `Bearer ${adminToken}`
         },
-        body: JSON.stringify({ published: !job.published })
+        body: JSON.stringify({ id: job.id, published: !job.published })
       });
 
       const data = await response.json();
