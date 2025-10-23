@@ -1,4 +1,5 @@
 const { Resend } = require("resend");
+const formidable = require('formidable');
 
 console.log("=== SEND CONTACT FUNCTION START ===");
 console.log("Environment variables:", {
@@ -19,77 +20,83 @@ exports.handler = async (event) => {
     console.log("Method not allowed:", event.httpMethod);
     return { statusCode: 405, body: "Method Not Allowed" };
   }
-  
+
+  let formData = {};
+  const contentType = event.headers['content-type'] || event.headers['Content-Type'];
+  console.log("Content-Type:", contentType);
   try {
-    let formData = {};
-    const contentType = event.headers['content-type'] || event.headers['Content-Type'];
-    console.log("Content-Type:", contentType);
-    
-    // Essayer JSON d'abord
-    try {
+    if (contentType && contentType.includes('multipart/form-data')) {
+      // Netlify v3: body est base64
+      const bodyBuffer = Buffer.from(event.body, event.isBase64Encoded ? 'base64' : 'utf8');
+      // Simuler stream http classique
+      let fields = {};
+      await new Promise((resolve, reject) => {
+        const form = formidable({ multiples: false });
+        form.parse({ headers: { 'content-type': contentType },
+                     on: () => {}, resume: () => {},
+                     pipe: () => {}, unpipe: () => {} },
+          bodyBuffer,
+          (err, parsedFields, files) => {
+            if (err) {
+              reject(err);
+            } else {
+              fields = parsedFields;
+              resolve();
+            }
+          });
+      });
+      // Si valeurs = array, prendre valeur [0]
+      Object.keys(fields).forEach(k => Array.isArray(fields[k]) ? fields[k] = fields[k][0] : null);
+      formData = fields;
+      console.log("Parsed as multipart/form-data:", formData);
+    } else if (contentType && contentType.includes('application/json')) {
       formData = JSON.parse(event.body);
       console.log("Parsed as JSON:", formData);
-    } catch (jsonError) {
-      // Si JSON échoue, essayer URLSearchParams
-      try {
-        const params = new URLSearchParams(event.body);
-        formData = Object.fromEntries(params);
-        console.log("Parsed as URLSearchParams:", formData);
-      } catch (urlError) {
-        // Dernier recours : parsing manuel simple
-        console.log("Trying manual parsing...");
-        const lines = event.body.split('\n');
-        for (const line of lines) {
-          if (line.includes('=')) {
-            const [key, value] = line.split('=', 2);
-            if (key && value) {
-              formData[key.trim()] = value.trim();
-            }
-          }
-        }
-        console.log("Manual parsing result:", formData);
-      }
+    } else if (contentType && contentType.includes('application/x-www-form-urlencoded')) {
+      const params = new URLSearchParams(event.body);
+      formData = Object.fromEntries(params);
+      console.log("Parsed as URLSearchParams:", formData);
     }
-    
-    console.log('Final form data:', formData);
-    console.log('Form data keys:', Object.keys(formData));
-    
-    // Gestion des champs en FR et fallback EN
-    const nom = formData.firstName || formData.prenom || formData.nom || '';
-    const prenom = formData.lastName || formData.prenom || '';
-    const email = formData.email || formData.mail || '';
-    const phone = formData.phone || formData.telephone || '';
-    const company = formData.company || formData.entreprise || '';
-    const position = formData.position || formData.poste || '';
-    const service = formData.service || formData.serviceInteresse || '';
-    const projectType = formData.projectType || formData.typeProjet || '';
-    
-    // Correction concat nom/prénom : si nom == prénom, n'affiche qu'une fois
-    const displayNom = nom === prenom ? nom : nom + ' ' + prenom;
-    
-    const emailHtml = `
-      <h1>Nouveau message de contact reçu</h1>
-      <p><strong>Nom:</strong> ${displayNom}</p>
-      <p><strong>Email:</strong> ${email}</p>
-      <p><strong>Téléphone:</strong> ${phone}</p>
-      <p><strong>Entreprise:</strong> ${company}</p>
-      <p><strong>Poste:</strong> ${position}</p>
-      <p><strong>Service intéressé:</strong> ${service}</p>
-      <p><strong>Type de projet:</strong> ${projectType}</p>
-    `;
-    
+  } catch (error) {
+    console.log("Could not parse body, error:", error);
+    return {
+      statusCode: 400,
+      body: JSON.stringify({ success: false, message: "Impossible de lire le formulaire contact", error: error.message })
+    };
+  }
+
+  console.log('Final form data:', formData);
+
+  const nom = formData.firstName || formData.prenom || formData.nom || '';
+  const prenom = formData.lastName || formData.prenom || '';
+  const email = formData.email || formData.mail || '';
+  const phone = formData.phone || formData.telephone || '';
+  const company = formData.company || formData.entreprise || '';
+  const position = formData.position || formData.poste || '';
+  const service = formData.service || formData.serviceInteresse || '';
+  const projectType = formData.projectType || formData.typeProjet || '';
+
+  const displayNom = nom === prenom ? nom : nom + ' ' + prenom;
+
+  const emailHtml = `
+    <h1>Nouveau message de contact reçu</h1>
+    <p><strong>Nom:</strong> ${displayNom}</p>
+    <p><strong>Email:</strong> ${email}</p>
+    <p><strong>Téléphone:</strong> ${phone}</p>
+    <p><strong>Entreprise:</strong> ${company}</p>
+    <p><strong>Poste:</strong> ${position}</p>
+    <p><strong>Service intéressé:</strong> ${service}</p>
+    <p><strong>Type de projet:</strong> ${projectType}</p>
+  `;
+
+  try {
     console.log("Attempting to send email...");
-    console.log("From: onboarding@resend.dev");
-    console.log("To:", process.env.DESTINATION_EMAIL);
-    console.log("Subject:", `Nouveau message de contact - ${displayNom}`);
-    
     const emailResult = await resend.emails.send({
       from: 'onboarding@resend.dev',
       to: process.env.DESTINATION_EMAIL,
       subject: `Nouveau message de contact - ${displayNom}`,
       html: emailHtml
     });
-    
     console.log("Email sent successfully:", emailResult);
     return {
       statusCode: 200,
@@ -97,7 +104,6 @@ exports.handler = async (event) => {
     };
   } catch (error) {
     console.error("Error in send-contact:", error);
-    console.error("Error stack:", error.stack);
     return {
       statusCode: 500,
       body: JSON.stringify({ success: false, message: error.message })
