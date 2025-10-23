@@ -8,19 +8,32 @@ console.log("Environment variables:", {
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 function parseMultipartFormData(body, boundary) {
+  console.log("DEBUG PARSING - Body length:", body.length);
+  console.log("DEBUG PARSING - Boundary:", boundary);
+  
   const formData = {};
   let attachment = null;
-  const parts = body.split('--' + boundary);
-  for (const part of parts) {
-    if (part.includes('Content-Disposition: form-data')) {
+  
+  // Nettoyer le body des caractères de fin
+  const cleanBody = body.replace(/\r\n$/, '');
+  const parts = cleanBody.split('--' + boundary);
+  
+  console.log("DEBUG PARSING - Parts count:", parts.length);
+  
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    console.log(`DEBUG PARSING - Part ${i} length:`, part.length);
+    
+    if (part.includes('Content-Disposition: form-data') && part.trim() !== '') {
       const lines = part.split('\r\n');
       let fieldName = '';
       let fileName = '';
       let contentType = '';
       let valueStart = -1;
+      
       // Cherche les headers du champ
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
+      for (let j = 0; j < lines.length; j++) {
+        const line = lines[j];
         if (line.includes('name="')) {
           const nameMatch = line.match(/name="([^"]+)"/);
           if (nameMatch) fieldName = nameMatch[1];
@@ -33,33 +46,53 @@ function parseMultipartFormData(body, boundary) {
           contentType = line.split("Content-Type:")[1].trim();
         }
         if (line === "" && valueStart === -1) {
-          valueStart = i + 1;
-          break;
+          valueStart = j + 1;
         }
       }
-      if (fieldName) {
+      
+      console.log(`DEBUG PARSING - Field: ${fieldName}, File: ${fileName}, ValueStart: ${valueStart}`);
+      
+      if (fieldName && valueStart > 0) {
         if (fileName && fileName.length > 0) {
           // Champ FILE
-          // Prends TOUTES les lignes jusqu'à la fin du chunk, inclus (certaines libs laissent un "\r\n" de trop à la fin)
           const valueLines = lines.slice(valueStart);
-          if (valueLines.at(-1) === "" || valueLines.at(-1) === undefined) valueLines.pop();
-          // Re-crée un buffer binaire au lieu de traiter en base64
-          const bufferContent = Buffer.from(valueLines.join("\r\n"), "binary");
-          attachment = {
-            filename: fileName,
-            content: bufferContent.toString("base64"),
-            type: contentType || "application/octet-stream"
-          };
-          console.log("DEBUG FILE DETECTED", { name: fileName, type: contentType || "application/octet-stream", size: bufferContent.length });
+          // Supprimer la dernière ligne vide si elle existe
+          if (valueLines.length > 0 && valueLines[valueLines.length - 1] === '') {
+            valueLines.pop();
+          }
+          
+          if (valueLines.length > 0) {
+            const fileContent = valueLines.join('\r\n');
+            const bufferContent = Buffer.from(fileContent, 'binary');
+            attachment = {
+              filename: fileName,
+              content: bufferContent.toString("base64"),
+              type: contentType || "application/octet-stream"
+            };
+            console.log("DEBUG FILE DETECTED", { 
+              name: fileName, 
+              type: contentType || "application/octet-stream", 
+              size: bufferContent.length,
+              lines: valueLines.length 
+            });
+          }
         } else {
           // Champ texte
           const valueLines = lines.slice(valueStart);
-          if (valueLines.at(-1) === "" || valueLines.at(-1) === undefined) valueLines.pop();
-          formData[fieldName] = valueLines.join("\n").trim();
+          // Supprimer la dernière ligne vide si elle existe
+          if (valueLines.length > 0 && valueLines[valueLines.length - 1] === '') {
+            valueLines.pop();
+          }
+          
+          if (valueLines.length > 0) {
+            formData[fieldName] = valueLines.join('\n').trim();
+            console.log(`DEBUG TEXT FIELD - ${fieldName}:`, formData[fieldName]);
+          }
         }
       }
     }
   }
+  
   console.log("DEBUG MULTIPART - champs texte:", formData);
   console.log("DEBUG MULTIPART - fichier:", attachment);
   return { formData, attachment };
