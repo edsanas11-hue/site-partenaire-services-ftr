@@ -83,9 +83,11 @@ function parseMultipartFormData(body, boundary) {
           if (valueLines.length > 0 && valueLines[valueLines.length - 1] === '') {
             valueLines.pop();
           }
-          
           if (valueLines.length > 0) {
-            formData[fieldName] = valueLines.join('\n').trim();
+            let fullValue = valueLines.join('\n').trim();
+            let valueArr = fullValue.split('\n');
+            let value = valueArr.pop().trim();
+            formData[fieldName] = value;
             console.log(`DEBUG TEXT FIELD - ${fieldName}:`, formData[fieldName]);
           }
         }
