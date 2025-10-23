@@ -65,37 +65,42 @@ function parseMultipartFormData(body, boundary) {
             // Pour les fichiers, traitement binaire ultra-robuste
             const fileContent = valueLines.join('\r\n');
             
-            // Méthode 1: Essayer de décoder en base64 d'abord
+            // Essayer différentes méthodes de décodage
             let bufferContent;
             let method = 'unknown';
             
+            // Méthode 1: Base64 direct
             try {
-              // Vérifier si c'est du base64 valide
               const base64Test = Buffer.from(fileContent, 'base64');
               const backToString = base64Test.toString('base64');
-              if (backToString === fileContent) {
+              if (backToString === fileContent && base64Test.length > 0) {
                 bufferContent = base64Test;
                 method = 'base64';
               } else {
                 throw new Error('Not valid base64');
               }
             } catch (e) {
-              // Méthode 2: Traitement binaire direct
+              // Méthode 2: Binary direct
               try {
                 bufferContent = Buffer.from(fileContent, 'binary');
                 method = 'binary';
               } catch (e2) {
-                // Méthode 3: Traitement UTF-8 puis conversion
+                // Méthode 3: UTF-8 puis conversion
                 bufferContent = Buffer.from(fileContent, 'utf8');
                 method = 'utf8';
               }
             }
+            
+            // Validation PDF
+            const isPDF = bufferContent.length > 4 && 
+                         bufferContent.slice(0, 4).toString() === '%PDF';
             
             attachment = {
               filename: fileName,
               content: bufferContent.toString("base64"),
               type: contentType || "application/pdf"
             };
+            
             console.log("DEBUG FILE DETECTED", { 
               name: fileName, 
               type: contentType || "application/pdf", 
@@ -103,7 +108,8 @@ function parseMultipartFormData(body, boundary) {
               lines: valueLines.length,
               method: method,
               firstBytes: bufferContent.slice(0, 10).toString('hex'),
-              isPDF: bufferContent.slice(0, 4).toString() === '%PDF'
+              isPDF: isPDF,
+              fileContentLength: fileContent.length
             });
           }
         } else {
@@ -147,7 +153,20 @@ exports.handler = async (event) => {
       const boundaryMatch = contentType.match(/boundary=([^;]+)/);
       const boundary = boundaryMatch ? boundaryMatch[1] : '----WebKitFormBoundary';
       console.log("Boundary:", boundary);
-      const body = event.isBase64Encoded ? Buffer.from(event.body, 'base64').toString('utf8') : event.body;
+      console.log("isBase64Encoded:", event.isBase64Encoded);
+      
+      // Traitement du body selon l'encodage
+      let body;
+      if (event.isBase64Encoded) {
+        // Le body est en base64, on le décode en buffer binaire
+        const rawBuffer = Buffer.from(event.body, 'base64');
+        body = rawBuffer.toString('utf8');
+        console.log("Body decoded from base64, length:", body.length);
+      } else {
+        body = event.body;
+        console.log("Body as string, length:", body.length);
+      }
+      
       const parsed = parseMultipartFormData(body, boundary);
       formData = parsed.formData;
       attachment = parsed.attachment;
