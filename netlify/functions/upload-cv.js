@@ -102,8 +102,10 @@ exports.handler = async (event) => {
     };
   }
 
+  // Génération dynamique de tous les champs présents du formulaire, sauf 'cv'
   let allFieldsHtml = '';
   for (const [key, value] of Object.entries(formData)) {
+    if (key === 'cv') continue;
     if (value && value !== '') {
       allFieldsHtml += `<p><strong>${key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}:</strong> ${value}</p>`;
     }
@@ -111,7 +113,7 @@ exports.handler = async (event) => {
 
   const emailHtml = `
     <h1>Nouvelle Candidature Reçue - Partenaire Services</h1>
-    <h2>📋 Détails de la candidature</h2>
+    <h2>📋 Détail de la candidature</h2>
     ${allFieldsHtml}
     <h2>📎 Documents</h2>
     <p><strong>CV:</strong> ${attachment ? `✅ ${attachment.filename} (${(attachment.content.length / 1024).toFixed(1)} KB)` : '❌ Non fourni'}</p>
