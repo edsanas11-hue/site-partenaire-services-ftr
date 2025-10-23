@@ -55,10 +55,18 @@ exports.handler = async (event) => {
       formData = JSON.parse(event.body);
     }
     console.log("Parsed form data:", formData);
-    const { firstName, lastName, email, phone, company, position, service, projectType } = formData;
+    // Gestion des champs en FR et fallback EN
+    const nom = formData.firstName || formData.prenom || formData.nom || '';
+    const prenom = formData.lastName || formData.prenom || '';
+    const email = formData.email || formData.mail || '';
+    const phone = formData.phone || '';
+    const company = formData.company || formData.entreprise || '';
+    const position = formData.position || formData.poste || '';
+    const service = formData.service || formData.serviceInteresse || '';
+    const projectType = formData.projectType || formData.typeProjet || '';
     const emailHtml = `
       <h1>Nouveau message de contact reçu</h1>
-      <p><strong>Nom:</strong> ${firstName} ${lastName}</p>
+      <p><strong>Nom:</strong> ${nom} ${prenom}</p>
       <p><strong>Email:</strong> ${email}</p>
       <p><strong>Téléphone:</strong> ${phone}</p>
       <p><strong>Entreprise:</strong> ${company}</p>
@@ -69,11 +77,11 @@ exports.handler = async (event) => {
     console.log("Attempting to send email...");
     console.log("From: onboarding@resend.dev");
     console.log("To:", process.env.DESTINATION_EMAIL);
-    console.log("Subject:", `Nouveau message de contact - ${firstName} ${lastName}`);
+    console.log("Subject:", `Nouveau message de contact - ${nom} ${prenom}`);
     const emailResult = await resend.emails.send({
       from: 'onboarding@resend.dev',
       to: process.env.DESTINATION_EMAIL,
-      subject: `Nouveau message de contact - ${firstName} ${lastName}`,
+      subject: `Nouveau message de contact - ${nom} ${prenom}`,
       html: emailHtml
     });
     console.log("Email sent successfully:", emailResult);
