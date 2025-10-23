@@ -133,10 +133,10 @@ exports.handler = async (event) => {
   }
   try {
     const destinationEmail = process.env.DESTINATION_EMAIL || 'edsanas11@gmail.com';
-    const finalEmail = formData.applyEmail || destinationEmail;
-    const jobTitle = formData.jobTitle || '';
-    const firstName = formData.firstName || '';
-    const lastName = formData.lastName || '';
+    let finalEmail = formData.applyEmail || destinationEmail;
+    let jobTitle = formData.jobTitle || '';
+    let firstName = formData.firstName || '';
+    let lastName = formData.lastName || '';
     if (finalEmail && typeof finalEmail === 'string')
       finalEmail = finalEmail.trim().replace(/[<>]/g, '');
     if (!finalEmail || !finalEmail.includes('@') || finalEmail.length < 5)
