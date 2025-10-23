@@ -23,10 +23,12 @@ function parseMultipartFormData(body, boundary) {
           const fieldName = nameMatch[1];
           // Nouvelle logique : prends la première ligne non vide après la première ligne vide
           const blankLineIdx = lines.findIndex(l => l === '');
-          let value = '';
+          // Amélioration : récupère toutes les lignes après la première ligne vide pour permettre textes multilignes
+          let valueLines = [];
           if (blankLineIdx !== -1 && lines.length > blankLineIdx + 1) {
-            value = lines[blankLineIdx + 1]?.trim() || '';
+            valueLines = lines.slice(blankLineIdx + 1).filter(l => l.trim() !== '' && !l.startsWith('--'));
           }
+          const value = valueLines.join('\n');
           formData[fieldName] = value;
         }
       }
@@ -59,8 +61,10 @@ exports.handler = async (event) => {
       console.log("Parsing JSON");
       formData = JSON.parse(event.body);
     }
-    console.log('Form data:', formData);
-    // Gestion des champs en FR et fallback EN
+    // Afficher tous les keys du formData pour debug
+    console.log('Form data keys:', Object.keys(formData));
+    console.log('Form data values:', formData);
+    // Correction concat nom/prénom : si nom == prénom, n'affiche qu'une fois
     const nom = formData.firstName || formData.prenom || formData.nom || '';
     const prenom = formData.lastName || formData.prenom || '';
     const email = formData.email || formData.mail || '';
@@ -69,9 +73,10 @@ exports.handler = async (event) => {
     const position = formData.position || formData.poste || '';
     const service = formData.service || formData.serviceInteresse || '';
     const projectType = formData.projectType || formData.typeProjet || '';
+    const displayNom = nom === prenom ? nom : nom + ' ' + prenom;
     const emailHtml = `
       <h1>Nouveau message de contact reçu</h1>
-      <p><strong>Nom:</strong> ${nom} ${prenom}</p>
+      <p><strong>Nom:</strong> ${displayNom}</p>
       <p><strong>Email:</strong> ${email}</p>
       <p><strong>Téléphone:</strong> ${phone}</p>
       <p><strong>Entreprise:</strong> ${company}</p>
