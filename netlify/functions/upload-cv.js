@@ -8,41 +8,99 @@ console.log("Environment variables:", {
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+// Parsing multipart/form-data robuste
+function parseMultipartFormData(body, boundary) {
+  const formData = {};
+  const parts = body.split('--' + boundary);
+  for (const part of parts) {
+    if (part.includes('Content-Disposition: form-data')) {
+      const lines = part.split('\r\n');
+      let fieldName = '';
+      let fieldValue = '';
+      let inValue = false;
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.includes('name="')) {
+          const nameMatch = line.match(/name="([^"]+)"/);
+          if (nameMatch) {
+            fieldName = nameMatch[1];
+          }
+        }
+        if (line === '' && fieldName) {
+          inValue = true;
+          continue;
+        }
+        if (inValue && fieldName) {
+          if (fieldValue) fieldValue += '\n';
+          fieldValue += line;
+        }
+      }
+      if (fieldName && fieldValue) {
+        formData[fieldName] = fieldValue.trim();
+      }
+    }
+  }
+  return formData;
+}
+
 exports.handler = async (event) => {
   console.log("=== UPLOAD CV HANDLER START ===");
   console.log("Event method:", event.httpMethod);
-  console.log("Event body:", event.body);
-  
+
   if (event.httpMethod !== "POST") {
     console.log("Method not allowed:", event.httpMethod);
     return { statusCode: 405, body: "Method Not Allowed" };
   }
 
+  let formData = {};
+  const contentType = event.headers['content-type'] || event.headers['Content-Type'];
+  console.log("Content-Type:", contentType);
+
   try {
-    const formData = JSON.parse(event.body);
-    console.log("Parsed form data:", formData);
-    const { firstName, lastName, email, phone, jobTitle, applyEmail } = formData;
+    if (contentType && contentType.includes('multipart/form-data')) {
+      // Extraire le boundary
+      const boundaryMatch = contentType.match(/boundary=([^;]+)/);
+      const boundary = boundaryMatch ? boundaryMatch[1] : '----WebKitFormBoundary';
+      console.log("Boundary:", boundary);
+      // Décoder base64 si nécessaire
+      const body = event.isBase64Encoded ? Buffer.from(event.body, 'base64').toString('utf8') : event.body;
+      formData = parseMultipartFormData(body, boundary);
+      console.log("Parsed as multipart/form-data:", formData);
+    } else if (contentType && contentType.includes('application/json')) {
+      formData = JSON.parse(event.body);
+      console.log("Parsed as JSON:", formData);
+    } else if (contentType && contentType.includes('application/x-www-form-urlencoded')) {
+      const params = new URLSearchParams(event.body);
+      formData = Object.fromEntries(params);
+      console.log("Parsed as URLSearchParams:", formData);
+    }
+  } catch (error) {
+    console.log("Could not parse body, error:", error);
+    return {
+      statusCode: 400,
+      body: JSON.stringify({ success: false, message: "Impossible de lire le formulaire d'offre d'emploi", error: error.message })
+    };
+  }
 
-    const emailHtml = `
-      <h1>Nouvelle Candidature Reçue - Partenaire Services</h1>
-      <h2>📋 Offre: ${jobTitle}</h2>
-      <p><strong>Nom:</strong> ${firstName} ${lastName}</p>
-      <p><strong>Email:</strong> ${email}</p>
-      <p><strong>Téléphone:</strong> ${phone}</p>
-    `;
+  console.log("Final form data:", formData);
+  const { firstName, lastName, email, phone, jobTitle, applyEmail } = formData;
 
+  const emailHtml = `
+    <h1>Nouvelle Candidature Reçue - Partenaire Services</h1>
+    <h2>📋 Offre: ${jobTitle}</h2>
+    <p><strong>Nom:</strong> ${firstName} ${lastName}</p>
+    <p><strong>Email:</strong> ${email}</p>
+    <p><strong>Téléphone:</strong> ${phone}</p>
+  `;
+
+  try {
     console.log("Attempting to send email...");
-    console.log("From: onboarding@resend.dev");
-    console.log("To:", applyEmail || process.env.DESTINATION_EMAIL);
-    console.log("Subject:", `Candidature pour l'offre - ${jobTitle} (${firstName} ${lastName})`);
-    
     const emailResult = await resend.emails.send({
       from: 'onboarding@resend.dev',
       to: applyEmail || process.env.DESTINATION_EMAIL,
       subject: `Candidature pour l'offre - ${jobTitle} (${firstName} ${lastName})`,
       html: emailHtml
     });
-    
     console.log("Email sent successfully:", emailResult);
 
     return {
@@ -51,7 +109,6 @@ exports.handler = async (event) => {
     };
   } catch (error) {
     console.error("Error in upload-cv:", error);
-    console.error("Error stack:", error.stack);
     return {
       statusCode: 500,
       body: JSON.stringify({ success: false, message: error.message })
