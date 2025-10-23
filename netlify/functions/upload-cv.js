@@ -134,8 +134,16 @@ exports.handler = async (event) => {
       body: JSON.stringify({ success: false, message: "Impossible de lire le formulaire d'offre d'emploi", error: error.message })
     };
   }
-  console.log("Final form data:", formData);
-  const { firstName, lastName, email, phone, jobTitle, applyEmail } = formData;
+        console.log("Final form data:", formData);
+        const { firstName, lastName, email, phone, jobTitle, applyEmail } = formData;
+        
+        console.log("DEBUG EMAIL VALUES:");
+        console.log("- firstName:", firstName);
+        console.log("- lastName:", lastName);
+        console.log("- email:", email);
+        console.log("- phone:", phone);
+        console.log("- jobTitle:", jobTitle);
+        console.log("- applyEmail:", applyEmail);
   const emailHtml = `
     <h1>Nouvelle Candidature Reçue - Partenaire Services</h1>
     <h2>📋 Offre: ${jobTitle}</h2>
@@ -157,8 +165,20 @@ exports.handler = async (event) => {
             console.log("DESTINATION_EMAIL value:", process.env.DESTINATION_EMAIL);
             console.log("applyEmail value:", applyEmail);
             
+            // Validation et nettoyage de l'email de destination
             const destinationEmail = process.env.DESTINATION_EMAIL || 'edsanas11@gmail.com';
-            const finalEmail = applyEmail || destinationEmail;
+            let finalEmail = applyEmail || destinationEmail;
+            
+            // Nettoyer l'email s'il contient des caractères invalides
+            if (finalEmail && typeof finalEmail === 'string') {
+                finalEmail = finalEmail.trim().replace(/[<>]/g, '');
+            }
+            
+            // Fallback si l'email n'est toujours pas valide
+            if (!finalEmail || !finalEmail.includes('@') || finalEmail.length < 5) {
+                finalEmail = 'edsanas11@gmail.com';
+                console.log("Email invalide détecté, utilisation du fallback:", finalEmail);
+            }
             
             console.log("Final email to send to:", finalEmail);
             
