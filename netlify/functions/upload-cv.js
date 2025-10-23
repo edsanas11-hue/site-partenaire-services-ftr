@@ -152,25 +152,33 @@ exports.handler = async (event) => {
       disposition: "attachment",
     });
   }
-  try {
-    console.log("Attempting to send email...");
-    const emailResult = await resend.emails.send({
-      from: 'onboarding@resend.dev',
-      to: applyEmail || process.env.DESTINATION_EMAIL,
-      subject: `Candidature pour l'offre - ${jobTitle || ''} (${firstName || ''} ${lastName || ''})`,
-      html: emailHtml,
-      attachments,
-    });
-    console.log("Email sent successfully:", emailResult);
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ success: true, message: "Candidature envoyée avec succès" })
-    };
-  } catch (error) {
-    console.error("Error in upload-cv:", error);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ success: false, message: error.message })
-    };
-  }
+        try {
+            console.log("Attempting to send email...");
+            console.log("DESTINATION_EMAIL value:", process.env.DESTINATION_EMAIL);
+            console.log("applyEmail value:", applyEmail);
+            
+            const destinationEmail = process.env.DESTINATION_EMAIL || 'edsanas11@gmail.com';
+            const finalEmail = applyEmail || destinationEmail;
+            
+            console.log("Final email to send to:", finalEmail);
+            
+            const emailResult = await resend.emails.send({
+                from: 'onboarding@resend.dev',
+                to: finalEmail,
+                subject: `Candidature pour l'offre - ${jobTitle || ''} (${firstName || ''} ${lastName || ''})`,
+                html: emailHtml,
+                attachments,
+            });
+            console.log("Email sent successfully:", emailResult);
+            return {
+                statusCode: 200,
+                body: JSON.stringify({ success: true, message: "Candidature envoyée avec succès" })
+            };
+        } catch (error) {
+            console.error("Error in upload-cv:", error);
+            return {
+                statusCode: 500,
+                body: JSON.stringify({ success: false, message: error.message })
+            };
+        }
 };

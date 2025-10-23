@@ -121,9 +121,14 @@ exports.handler = async (event) => {
 
   try {
     console.log("Attempting to send email...");
+    console.log("DESTINATION_EMAIL value:", process.env.DESTINATION_EMAIL);
+    
+    const destinationEmail = process.env.DESTINATION_EMAIL || 'edsanas11@gmail.com';
+    console.log("Final email to send to:", destinationEmail);
+    
     const emailResult = await resend.emails.send({
       from: 'onboarding@resend.dev',
-      to: process.env.DESTINATION_EMAIL,
+      to: destinationEmail,
       subject: `Nouveau message de contact - ${displayNom}`,
       html: emailHtml
     });
