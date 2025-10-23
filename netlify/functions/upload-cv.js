@@ -41,7 +41,6 @@ function parseMultipartFormData(body, boundary) {
         }
       }
       if (fieldName && fileName && valueLines.length > 0 && fileName.length > 0) {
-        // Fichier attaché
         const fileData = valueLines.join('\n').trim();
         attachment = {
           filename: fileName,
@@ -53,6 +52,9 @@ function parseMultipartFormData(body, boundary) {
       }
     }
   }
+  // Ajoute un log détaillé du parsing
+  console.log("DEBUG MULTIPART - champs texte:", formData);
+  console.log("DEBUG MULTIPART - fichier:", attachment);
   return { formData, attachment };
 }
 
