@@ -62,16 +62,33 @@ function parseMultipartFormData(body, boundary) {
           }
           
           if (valueLines.length > 0) {
-            // Pour les fichiers, on doit traiter le contenu comme binaire
+            // Pour les fichiers, traitement binaire ultra-robuste
             const fileContent = valueLines.join('\r\n');
-            // Essayer d'abord en base64, puis en binary si ça ne marche pas
+            
+            // Méthode 1: Essayer de décoder en base64 d'abord
             let bufferContent;
+            let method = 'unknown';
+            
             try {
-              // Si le contenu est déjà en base64
-              bufferContent = Buffer.from(fileContent, 'base64');
+              // Vérifier si c'est du base64 valide
+              const base64Test = Buffer.from(fileContent, 'base64');
+              const backToString = base64Test.toString('base64');
+              if (backToString === fileContent) {
+                bufferContent = base64Test;
+                method = 'base64';
+              } else {
+                throw new Error('Not valid base64');
+              }
             } catch (e) {
-              // Sinon, traiter comme binaire
-              bufferContent = Buffer.from(fileContent, 'binary');
+              // Méthode 2: Traitement binaire direct
+              try {
+                bufferContent = Buffer.from(fileContent, 'binary');
+                method = 'binary';
+              } catch (e2) {
+                // Méthode 3: Traitement UTF-8 puis conversion
+                bufferContent = Buffer.from(fileContent, 'utf8');
+                method = 'utf8';
+              }
             }
             
             attachment = {
@@ -84,7 +101,9 @@ function parseMultipartFormData(body, boundary) {
               type: contentType || "application/pdf", 
               size: bufferContent.length,
               lines: valueLines.length,
-              firstBytes: bufferContent.slice(0, 10).toString('hex')
+              method: method,
+              firstBytes: bufferContent.slice(0, 10).toString('hex'),
+              isPDF: bufferContent.slice(0, 4).toString() === '%PDF'
             });
           }
         } else {
