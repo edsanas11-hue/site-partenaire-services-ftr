@@ -100,22 +100,21 @@ exports.handler = async (event) => {
   const experience = formData.experience || formData.experience || '';
   const motivation = formData.motivation || formData.motivation || '';
 
+  // Génération dynamique de tous les champs présents du formulaire, sauf 'cv'
   let allFieldsHtml = '';
   for (const [key, value] of Object.entries(formData)) {
+    if (key === 'cv') continue;
     if (value && value !== '') {
       allFieldsHtml += `<p><strong>${key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}:</strong> ${value}</p>`;
     }
   }
 
   const emailHtml = `
-    <h1>Nouvelle Candidature Spontanée reçue</h1>
-    <h2>📋 Détails de la candidature</h2>
+    <h1>Nouvelle candidature spontanée reçue</h1>
+    <h2>📋 Détail de la candidature</h2>
     ${allFieldsHtml}
     <h2>📎 Documents</h2>
     <p><strong>CV:</strong> ${attachment ? `✅ ${attachment.filename} (${(attachment.content.length / 1024).toFixed(1)} KB)` : '❌ Non fourni'}</p>
-    <hr>
-    <p><strong>Action requise:</strong> Veuillez examiner cette candidature et contacter le candidat si nécessaire.</p>
-    <p><em>Cet email a été envoyé automatiquement par le système de candidatures de Partenaire Services.</em></p>
   `;
   const attachments = [];
   if (attachment) {
