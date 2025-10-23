@@ -8,7 +8,10 @@ console.log("Environment variables:", {
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Parsing multipart/form-data robuste
+let attachmentBuffer = null;
+let attachmentName = null;
+let attachmentType = null;
+
 function parseMultipartFormData(body, boundary) {
   const formData = {};
   const parts = body.split('--' + boundary);
@@ -16,27 +19,39 @@ function parseMultipartFormData(body, boundary) {
     if (part.includes('Content-Disposition: form-data')) {
       const lines = part.split('\r\n');
       let fieldName = '';
-      let fieldValue = '';
+      let fileName = '';
+      let contentType = '';
+      let valueLines = [];
       let inValue = false;
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         if (line.includes('name="')) {
           const nameMatch = line.match(/name="([^"]+)"/);
-          if (nameMatch) {
-            fieldName = nameMatch[1];
-          }
+          if (nameMatch) fieldName = nameMatch[1];
+        }
+        if (line.includes('filename="')) {
+          const fileMatch = line.match(/filename="([^"]*)"/);
+          if (fileMatch) fileName = fileMatch[1];
+        }
+        if (line.startsWith("Content-Type:")) {
+          contentType = line.split("Content-Type:")[1].trim();
         }
         if (line === '' && fieldName) {
           inValue = true;
           continue;
         }
-        if (inValue && fieldName) {
-          if (fieldValue) fieldValue += '\n';
-          fieldValue += line;
+        if (inValue) {
+          valueLines.push(line);
         }
       }
-      if (fieldName && fieldValue) {
-        formData[fieldName] = fieldValue.trim();
+      if (fieldName && fileName && valueLines.length > 0) {
+        // Fichier attaché
+        const fileData = valueLines.join('\n').trim();
+        attachmentBuffer = Buffer.from(fileData, 'base64');
+        attachmentName = fileName;
+        attachmentType = contentType || "application/octet-stream";
+      } else if (fieldName && valueLines.length > 0) {
+        formData[fieldName] = valueLines.join('\n').trim();
       }
     }
   }
@@ -93,13 +108,24 @@ exports.handler = async (event) => {
     <p><strong>Téléphone:</strong> ${phone}</p>
   `;
 
+  const attachments = [];
+  if (attachmentBuffer && attachmentName) {
+    attachments.push({
+      filename: attachmentName,
+      content: attachmentBuffer.toString('base64'),
+      type: attachmentType,
+      disposition: "attachment",
+    });
+  }
+
   try {
     console.log("Attempting to send email...");
     const emailResult = await resend.emails.send({
       from: 'onboarding@resend.dev',
       to: applyEmail || process.env.DESTINATION_EMAIL,
       subject: `Candidature pour l'offre - ${jobTitle} (${firstName} ${lastName})`,
-      html: emailHtml
+      html: emailHtml,
+      attachments,
     });
     console.log("Email sent successfully:", emailResult);
 
