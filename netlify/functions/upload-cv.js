@@ -17,8 +17,8 @@ function parseMultipartFormData(body, boundary) {
       let fieldName = '';
       let fileName = '';
       let contentType = '';
-      let valueLines = [];
-      let inValue = false;
+      let valueStart = -1;
+      // Cherche les headers du champ
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         if (line.includes('name="')) {
@@ -32,27 +32,34 @@ function parseMultipartFormData(body, boundary) {
         if (line.startsWith("Content-Type:")) {
           contentType = line.split("Content-Type:")[1].trim();
         }
-        if (line === '' && fieldName) {
-          inValue = true;
-          continue;
-        }
-        if (inValue) {
-          valueLines.push(line);
+        if (line === "" && valueStart === -1) {
+          valueStart = i + 1;
+          break;
         }
       }
-      if (fieldName && fileName && valueLines.length > 0 && fileName.length > 0) {
-        const fileData = valueLines.join('\n').trim();
-        attachment = {
-          filename: fileName,
-          content: fileData,
-          type: contentType || "application/octet-stream"
-        };
-      } else if (fieldName && valueLines.length > 0 && !fileName) {
-        formData[fieldName] = valueLines.join('\n').trim();
+      if (fieldName) {
+        if (fileName && fileName.length > 0) {
+          // Champ FILE
+          // Prends TOUTES les lignes jusqu'à la fin du chunk, inclus (certaines libs laissent un "\r\n" de trop à la fin)
+          const valueLines = lines.slice(valueStart);
+          if (valueLines.at(-1) === "" || valueLines.at(-1) === undefined) valueLines.pop();
+          // Re-crée un buffer binaire au lieu de traiter en base64
+          const bufferContent = Buffer.from(valueLines.join("\r\n"), "binary");
+          attachment = {
+            filename: fileName,
+            content: bufferContent.toString("base64"),
+            type: contentType || "application/octet-stream"
+          };
+          console.log("DEBUG FILE DETECTED", { name: fileName, type: contentType || "application/octet-stream", size: bufferContent.length });
+        } else {
+          // Champ texte
+          const valueLines = lines.slice(valueStart);
+          if (valueLines.at(-1) === "" || valueLines.at(-1) === undefined) valueLines.pop();
+          formData[fieldName] = valueLines.join("\n").trim();
+        }
       }
     }
   }
-  // Ajoute un log détaillé du parsing
   console.log("DEBUG MULTIPART - champs texte:", formData);
   console.log("DEBUG MULTIPART - fichier:", attachment);
   return { formData, attachment };
@@ -107,7 +114,7 @@ exports.handler = async (event) => {
   if (attachment) {
     attachments.push({
       filename: attachment.filename,
-      content: Buffer.from(attachment.content, 'base64').toString('base64'),
+      content: attachment.content, // Buffer.toString('base64'), already correct
       type: attachment.type,
       disposition: "attachment",
     });
