@@ -54,7 +54,7 @@ function parseMultipartFormData(body, boundary) {
       
       if (fieldName && valueStart > 0) {
         if (fileName && fileName.length > 0) {
-          // Champ FILE
+          // Champ FILE - traitement binaire robuste
           const valueLines = lines.slice(valueStart);
           // Supprimer la dernière ligne vide si elle existe
           if (valueLines.length > 0 && valueLines[valueLines.length - 1] === '') {
@@ -62,28 +62,40 @@ function parseMultipartFormData(body, boundary) {
           }
           
           if (valueLines.length > 0) {
+            // Pour les fichiers, on doit traiter le contenu comme binaire
             const fileContent = valueLines.join('\r\n');
-            const bufferContent = Buffer.from(fileContent, 'binary');
+            // Essayer d'abord en base64, puis en binary si ça ne marche pas
+            let bufferContent;
+            try {
+              // Si le contenu est déjà en base64
+              bufferContent = Buffer.from(fileContent, 'base64');
+            } catch (e) {
+              // Sinon, traiter comme binaire
+              bufferContent = Buffer.from(fileContent, 'binary');
+            }
+            
             attachment = {
               filename: fileName,
               content: bufferContent.toString("base64"),
-              type: contentType || "application/octet-stream"
+              type: contentType || "application/pdf"
             };
             console.log("DEBUG FILE DETECTED", { 
               name: fileName, 
-              type: contentType || "application/octet-stream", 
+              type: contentType || "application/pdf", 
               size: bufferContent.length,
-              lines: valueLines.length 
+              lines: valueLines.length,
+              firstBytes: bufferContent.slice(0, 10).toString('hex')
             });
           }
         } else {
-          // Champ texte
+          // Champ texte - extraction de la vraie valeur
           const valueLines = lines.slice(valueStart);
           // Supprimer la dernière ligne vide si elle existe
           if (valueLines.length > 0 && valueLines[valueLines.length - 1] === '') {
             valueLines.pop();
           }
           if (valueLines.length > 0) {
+            // Prendre la dernière ligne non vide (la vraie valeur)
             let fullValue = valueLines.join('\n').trim();
             let valueArr = fullValue.split('\n');
             let value = valueArr.pop().trim();
@@ -146,13 +158,24 @@ exports.handler = async (event) => {
         console.log("- phone:", phone);
         console.log("- jobTitle:", jobTitle);
         console.log("- applyEmail:", applyEmail);
-  const emailHtml = `
-    <h1>Nouvelle Candidature Reçue - Partenaire Services</h1>
-    <h2>📋 Offre: ${jobTitle}</h2>
-    <p><strong>Nom:</strong> ${firstName || ''} ${lastName || ''}</p>
-    <p><strong>Email:</strong> ${email || ''}</p>
-    <p><strong>Téléphone:</strong> ${phone || ''}</p>
-  `;
+        const emailHtml = `
+            <h1>Nouvelle Candidature Reçue - Partenaire Services</h1>
+            
+            <h2>📋 Détails de l'Offre</h2>
+            <p><strong>Poste:</strong> ${jobTitle || 'Non spécifié'}</p>
+            
+            <h2>👤 Informations du Candidat</h2>
+            <p><strong>Nom complet:</strong> ${firstName || ''} ${lastName || ''}</p>
+            <p><strong>Email:</strong> ${email || 'Non fourni'}</p>
+            <p><strong>Téléphone:</strong> ${phone || 'Non fourni'}</p>
+            
+            <h2>📎 Documents</h2>
+            <p><strong>CV:</strong> ${attachment ? `✅ ${attachment.filename} (${(attachment.content.length / 1024).toFixed(1)} KB)` : '❌ Non fourni'}</p>
+            
+            <hr>
+            <p><strong>Action requise:</strong> Veuillez examiner cette candidature et contacter le candidat si nécessaire.</p>
+            <p><em>Cet email a été envoyé automatiquement par le système de candidatures de Partenaire Services.</em></p>
+        `;
   const attachments = [];
   if (attachment) {
     attachments.push({
