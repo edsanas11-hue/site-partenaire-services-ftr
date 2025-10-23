@@ -1,5 +1,4 @@
 const { Resend } = require("resend");
-const formidable = require('formidable');
 
 console.log("=== SEND CONTACT FUNCTION START ===");
 console.log("Environment variables:", {
@@ -8,6 +7,48 @@ console.log("Environment variables:", {
 });
 
 const resend = new Resend(process.env.RESEND_API_KEY);
+
+// Fonction pour parser multipart/form-data manuellement
+function parseMultipartFormData(body, boundary) {
+  const formData = {};
+  const parts = body.split('--' + boundary);
+  
+  for (const part of parts) {
+    if (part.includes('Content-Disposition: form-data')) {
+      const lines = part.split('\r\n');
+      let fieldName = '';
+      let fieldValue = '';
+      let inValue = false;
+      
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        
+        if (line.includes('name="')) {
+          const nameMatch = line.match(/name="([^"]+)"/);
+          if (nameMatch) {
+            fieldName = nameMatch[1];
+          }
+        }
+        
+        if (line === '' && fieldName) {
+          inValue = true;
+          continue;
+        }
+        
+        if (inValue && fieldName) {
+          if (fieldValue) fieldValue += '\n';
+          fieldValue += line;
+        }
+      }
+      
+      if (fieldName && fieldValue) {
+        formData[fieldName] = fieldValue.trim();
+      }
+    }
+  }
+  
+  return formData;
+}
 
 exports.handler = async (event) => {
   console.log("=== SEND CONTACT HANDLER START ===");
@@ -24,30 +65,19 @@ exports.handler = async (event) => {
   let formData = {};
   const contentType = event.headers['content-type'] || event.headers['Content-Type'];
   console.log("Content-Type:", contentType);
+  
   try {
     if (contentType && contentType.includes('multipart/form-data')) {
-      // Netlify v3: body est base64
-      const bodyBuffer = Buffer.from(event.body, event.isBase64Encoded ? 'base64' : 'utf8');
-      // Simuler stream http classique
-      let fields = {};
-      await new Promise((resolve, reject) => {
-        const form = formidable({ multiples: false });
-        form.parse({ headers: { 'content-type': contentType },
-                     on: () => {}, resume: () => {},
-                     pipe: () => {}, unpipe: () => {} },
-          bodyBuffer,
-          (err, parsedFields, files) => {
-            if (err) {
-              reject(err);
-            } else {
-              fields = parsedFields;
-              resolve();
-            }
-          });
-      });
-      // Si valeurs = array, prendre valeur [0]
-      Object.keys(fields).forEach(k => Array.isArray(fields[k]) ? fields[k] = fields[k][0] : null);
-      formData = fields;
+      // Extraire le boundary
+      const boundaryMatch = contentType.match(/boundary=([^;]+)/);
+      const boundary = boundaryMatch ? boundaryMatch[1] : '----WebKitFormBoundary';
+      
+      console.log("Boundary:", boundary);
+      
+      // Décoder base64 si nécessaire
+      const body = event.isBase64Encoded ? Buffer.from(event.body, 'base64').toString('utf8') : event.body;
+      
+      formData = parseMultipartFormData(body, boundary);
       console.log("Parsed as multipart/form-data:", formData);
     } else if (contentType && contentType.includes('application/json')) {
       formData = JSON.parse(event.body);
