@@ -102,15 +102,17 @@ exports.handler = async (event) => {
     };
   }
 
-  const { firstName, lastName, email, phone, jobTitle, applyEmail } = formData;
+  let allFieldsHtml = '';
+  for (const [key, value] of Object.entries(formData)) {
+    if (value && value !== '') {
+      allFieldsHtml += `<p><strong>${key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}:</strong> ${value}</p>`;
+    }
+  }
+
   const emailHtml = `
     <h1>Nouvelle Candidature Reçue - Partenaire Services</h1>
-    <h2>📋 Détails de l'Offre</h2>
-    <p><strong>Poste:</strong> ${jobTitle || 'Non spécifié'}</p>
-    <h2>👤 Informations du Candidat</h2>
-    <p><strong>Nom complet:</strong> ${firstName || ''} ${lastName || ''}</p>
-    <p><strong>Email:</strong> ${email || 'Non fourni'}</p>
-    <p><strong>Téléphone:</strong> ${phone || 'Non fourni'}</p>
+    <h2>📋 Détails de la candidature</h2>
+    ${allFieldsHtml}
     <h2>📎 Documents</h2>
     <p><strong>CV:</strong> ${attachment ? `✅ ${attachment.filename} (${(attachment.content.length / 1024).toFixed(1)} KB)` : '❌ Non fourni'}</p>
     <hr>
