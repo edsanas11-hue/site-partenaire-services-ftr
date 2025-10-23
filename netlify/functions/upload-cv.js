@@ -133,15 +133,19 @@ exports.handler = async (event) => {
   }
   try {
     const destinationEmail = process.env.DESTINATION_EMAIL || 'edsanas11@gmail.com';
-    let finalEmail = applyEmail || destinationEmail;
+    const finalEmail = formData.applyEmail || destinationEmail;
+    const jobTitle = formData.jobTitle || '';
+    const firstName = formData.firstName || '';
+    const lastName = formData.lastName || '';
     if (finalEmail && typeof finalEmail === 'string')
       finalEmail = finalEmail.trim().replace(/[<>]/g, '');
     if (!finalEmail || !finalEmail.includes('@') || finalEmail.length < 5)
       finalEmail = 'edsanas11@gmail.com';
+    // Pour le send, utilise bien les variables nouvellement extraites :
     const emailResult = await resend.emails.send({
       from: 'onboarding@resend.dev',
       to: finalEmail,
-      subject: `Candidature pour l'offre - ${jobTitle || ''} (${firstName || ''} ${lastName || ''})`,
+      subject: `Candidature pour l'offre - ${jobTitle} (${firstName} ${lastName})`,
       html: emailHtml,
       attachments,
     });
