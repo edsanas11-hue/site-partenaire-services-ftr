@@ -5,148 +5,93 @@ console.log("Environment variables:", {
   RESEND_API_KEY: process.env.RESEND_API_KEY ? "SET" : "NOT SET",
   DESTINATION_EMAIL: process.env.DESTINATION_EMAIL ? "SET" : "NOT SET"
 });
-
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Fonction pour parser multipart/form-data manuellement
-function parseMultipartFormData(body, boundary) {
-  console.log("DEBUG PARSING - Body length:", body.length);
-  console.log("DEBUG PARSING - Boundary:", boundary);
-  
-  const formData = {};
+// Parsing multipart binaire/utf8 (copié de upload-cv.js)
+function parseMultipartFormDataBuffer(rawBuffer, boundary) {
+  const results = {};
   let attachment = null;
-  
-  // Nettoyer le body des caractères de fin
-  const cleanBody = body.replace(/\r\n$/, '');
-  const parts = cleanBody.split('--' + boundary);
-  
-  console.log("DEBUG PARSING - Parts count:", parts.length);
-  
-  for (let i = 0; i < parts.length; i++) {
-    const part = parts[i];
-    console.log(`DEBUG PARSING - Part ${i} length:`, part.length);
-    
-    if (part.includes('Content-Disposition: form-data') && part.trim() !== '') {
-      const lines = part.split('\r\n');
-      let fieldName = '';
-      let fileName = '';
-      let contentType = '';
-      let valueStart = -1;
-      
-      // Cherche les headers du champ
-      for (let j = 0; j < lines.length; j++) {
-        const line = lines[j];
-        if (line.includes('name="')) {
-          const nameMatch = line.match(/name="([^"]+)"/);
+  const boundaryBuffer = Buffer.from(`--${boundary}`);
+  let state = 0;
+  let partStart = 0;
+  for (let i = 0; i < rawBuffer.length; i++) {
+    if (
+      rawBuffer.slice(i, i + boundaryBuffer.length).equals(boundaryBuffer)
+    ) {
+      if (state === 1) {
+        const partBuffer = rawBuffer.slice(partStart, i - 2); // -2 pour \r\n
+        const doubleCRLF = partBuffer.indexOf(Buffer.from('\r\n\r\n'));
+        if (doubleCRLF !== -1) {
+          const headersBuf = partBuffer.slice(0, doubleCRLF).toString();
+          const contentBuf = partBuffer.slice(doubleCRLF + 4);
+          let fieldName = '';
+          let fileName = '';
+          let contentType = '';
+
+          const nameMatch = headersBuf.match(/name="([^"]+)"/);
           if (nameMatch) fieldName = nameMatch[1];
-        }
-        if (line.includes('filename="')) {
-          const fileMatch = line.match(/filename="([^"]*)"/);
+          const fileMatch = headersBuf.match(/filename="([^"]*)"/);
           if (fileMatch) fileName = fileMatch[1];
-        }
-        if (line.startsWith("Content-Type:")) {
-          contentType = line.split("Content-Type:")[1].trim();
-        }
-        if (line === "" && valueStart === -1) {
-          valueStart = j + 1;
-        }
-      }
-      
-      console.log(`DEBUG PARSING - Field: ${fieldName}, File: ${fileName}, ValueStart: ${valueStart}`);
-      
-      if (fieldName && valueStart > 0) {
-        if (fileName && fileName.length > 0) {
-          // Champ FILE
-          const valueLines = lines.slice(valueStart);
-          // Supprimer la dernière ligne vide si elle existe
-          if (valueLines.length > 0 && valueLines[valueLines.length - 1] === '') {
-            valueLines.pop();
-          }
-          
-          if (valueLines.length > 0) {
-            const fileContent = valueLines.join('\r\n');
-            const bufferContent = Buffer.from(fileContent, 'binary');
+          const ctMatch = headersBuf.match(/Content-Type: (.+)/);
+          if (ctMatch) contentType = ctMatch[1];
+
+          if (fileName && fileName.length > 0) {
             attachment = {
               filename: fileName,
-              content: bufferContent.toString("base64"),
-              type: contentType || "application/octet-stream"
+              content: contentBuf.toString("base64"),
+              type: contentType || "application/pdf"
             };
-            console.log("DEBUG FILE DETECTED", { 
-              name: fileName, 
-              type: contentType || "application/octet-stream", 
-              size: bufferContent.length,
-              lines: valueLines.length 
+            console.log('DEBUG FILE =', {
+              name: fileName,
+              contentType,
+              size: contentBuf.length,
+              start: contentBuf.slice(0, 8).toString("hex"),
+              isPDF: contentBuf.slice(0, 4).toString() === '%PDF'
             });
-          }
-        } else {
-          // Champ texte
-          const valueLines = lines.slice(valueStart);
-          // Supprimer la dernière ligne vide si elle existe
-          if (valueLines.length > 0 && valueLines[valueLines.length - 1] === '') {
-            valueLines.pop();
-          }
-          
-          if (valueLines.length > 0) {
-            formData[fieldName] = valueLines.join('\n').trim();
-            console.log(`DEBUG TEXT FIELD - ${fieldName}:`, formData[fieldName]);
+          } else if (fieldName) {
+            results[fieldName] = contentBuf.toString('utf8').trim();
+            console.log(`DEBUG TEXT FIELD - ${fieldName}:`, results[fieldName]);
           }
         }
       }
+      state = 1;
+      partStart = i + boundaryBuffer.length + 2; // +2 pour sauter \r\n
+      i = partStart;
     }
   }
-  
-  console.log("DEBUG MULTIPART - champs texte:", formData);
-  console.log("DEBUG MULTIPART - fichier:", attachment);
-  return { formData, attachment };
+  return { formData: results, attachment };
 }
 
 exports.handler = async (event) => {
   console.log("=== SEND APPLICATION HANDLER START ===");
-  console.log("Event method:", event.httpMethod);
-  console.log("Event headers:", event.headers);
-  console.log("Event body type:", typeof event.body);
-  console.log("Event body length:", event.body ? event.body.length : 0);
-
-  if (event.httpMethod !== "POST") {
-    console.log("Method not allowed:", event.httpMethod);
+  if (event.httpMethod !== "POST")
     return { statusCode: 405, body: "Method Not Allowed" };
-  }
 
   let formData = {};
   let attachment = null;
   const contentType = event.headers['content-type'] || event.headers['Content-Type'];
-  console.log("Content-Type:", contentType);
-  
   try {
     if (contentType && contentType.includes('multipart/form-data')) {
-      // Extraire le boundary
       const boundaryMatch = contentType.match(/boundary=([^;]+)/);
       const boundary = boundaryMatch ? boundaryMatch[1] : '----WebKitFormBoundary';
-      console.log("Boundary:", boundary);
-      // Décoder base64 si nécessaire
-      const body = event.isBase64Encoded ? Buffer.from(event.body, 'base64').toString('utf8') : event.body;
-      const parsed = parseMultipartFormData(body, boundary);
+      const rawBuffer = event.isBase64Encoded ? Buffer.from(event.body, 'base64') : Buffer.from(event.body, 'binary');
+      const parsed = parseMultipartFormDataBuffer(rawBuffer, boundary);
       formData = parsed.formData;
       attachment = parsed.attachment;
-      console.log("Parsed as multipart/form-data:", formData, attachment);
+      console.log("Parsed multipart (buffer):", formData, attachment);
     } else if (contentType && contentType.includes('application/json')) {
       formData = JSON.parse(event.body);
-      console.log("Parsed as JSON:", formData);
     } else if (contentType && contentType.includes('application/x-www-form-urlencoded')) {
       const params = new URLSearchParams(event.body);
       formData = Object.fromEntries(params);
-      console.log("Parsed as URLSearchParams:", formData);
     }
   } catch (error) {
-    console.log("Could not parse body, error:", error);
+    console.error("Could not parse body, error:", error);
     return {
       statusCode: 400,
       body: JSON.stringify({ success: false, message: "Impossible de lire le formulaire de candidature", error: error.message })
     };
   }
-
-  console.log('Final form data:', formData);
-
   const firstName = formData.firstName || formData.prenom || '';
   const lastName = formData.lastName || formData.nom || '';
   const email = formData.email || formData.mail || '';
@@ -166,7 +111,6 @@ exports.handler = async (event) => {
     <p>${motivation}</p>
     <p><strong>CV:</strong> ${attachment ? `✅ ${attachment.filename} (${(attachment.content.length / 1024).toFixed(1)} KB)` : '❌ Non fourni'}</p>
   `;
-
   const attachments = [];
   if (attachment) {
     attachments.push({
@@ -178,18 +122,13 @@ exports.handler = async (event) => {
   }
 
   try {
-    console.log("Attempting to send email...");
-    console.log("DESTINATION_EMAIL value:", process.env.DESTINATION_EMAIL);
-    
     const destinationEmail = process.env.DESTINATION_EMAIL || 'edsanas11@gmail.com';
-    console.log("Final email to send to:", destinationEmail);
-    
     const emailResult = await resend.emails.send({
       from: 'onboarding@resend.dev',
       to: destinationEmail,
       subject: `Candidature spontanée - ${firstName} ${lastName}`,
       html: emailHtml,
-      attachments: attachments
+      attachments,
     });
     console.log("Email sent successfully:", emailResult);
     return {
