@@ -40,7 +40,7 @@ function parseMultipartFormData(body, boundary) {
           valueLines.push(line);
         }
       }
-      if (fieldName && fileName && valueLines.length > 0) {
+      if (fieldName && fileName && valueLines.length > 0 && fileName.length > 0) {
         // Fichier attaché
         const fileData = valueLines.join('\n').trim();
         attachment = {
@@ -48,7 +48,7 @@ function parseMultipartFormData(body, boundary) {
           content: fileData,
           type: contentType || "application/octet-stream"
         };
-      } else if (fieldName && valueLines.length > 0) {
+      } else if (fieldName && valueLines.length > 0 && !fileName) {
         formData[fieldName] = valueLines.join('\n').trim();
       }
     }
