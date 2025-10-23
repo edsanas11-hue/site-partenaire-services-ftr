@@ -16,8 +16,8 @@ function parseMultipartFormDataBinary(buffer, boundary) {
   const formData = {};
   let attachment = null;
 
-  // Convertir le buffer en string pour le parsing
-  const body = buffer.toString('binary');
+  // Convertir le buffer en string pour le parsing (UTF-8 pour les caractères accentués)
+  const body = buffer.toString('utf8');
   const parts = body.split('--' + boundary);
 
   console.log("DEBUG BINARY PARSING - Parts count:", parts.length);
@@ -56,7 +56,7 @@ function parseMultipartFormDataBinary(buffer, boundary) {
 
       if (fieldName) {
         if (fileName && fileName.length > 0) {
-          // FICHIER: Traitement binaire pur
+          // FICHIER: Traitement binaire pur (reconvertir en binary pour les fichiers)
           const fileBuffer = Buffer.from(content, 'binary');
           
           attachment = {
@@ -73,7 +73,7 @@ function parseMultipartFormDataBinary(buffer, boundary) {
             isPDF: fileBuffer.slice(0, 4).toString() === '%PDF'
           });
         } else {
-          // TEXTE: Extraction simple
+          // TEXTE: Extraction avec encodage UTF-8 correct
           formData[fieldName] = content.trim();
           console.log(`DEBUG BINARY TEXT FIELD - ${fieldName}:`, formData[fieldName]);
         }
