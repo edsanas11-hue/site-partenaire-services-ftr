@@ -108,15 +108,17 @@ exports.handler = async (event) => {
 
   const displayNom = nom === prenom ? nom : nom + ' ' + prenom;
 
+  // Génération dynamique de tous les champs présents
+  let allFieldsHtml = '';
+  for (const [key, value] of Object.entries(formData)) {
+    if (value && value !== '') {
+      allFieldsHtml += `<p><strong>${key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}:</strong> ${value}</p>`;
+    }
+  }
+
   const emailHtml = `
     <h1>Nouveau message de contact reçu</h1>
-    <p><strong>Nom:</strong> ${displayNom}</p>
-    <p><strong>Email:</strong> ${email}</p>
-    <p><strong>Téléphone:</strong> ${phone}</p>
-    <p><strong>Entreprise:</strong> ${company}</p>
-    <p><strong>Poste:</strong> ${position}</p>
-    <p><strong>Service intéressé:</strong> ${service}</p>
-    <p><strong>Type de projet:</strong> ${projectType}</p>
+    ${allFieldsHtml}
   `;
 
   try {
