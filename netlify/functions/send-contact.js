@@ -21,7 +21,12 @@ function parseMultipartFormData(body, boundary) {
         const nameMatch = disposition.match(/name="([^"]+)"/);
         if (nameMatch) {
           const fieldName = nameMatch[1];
-          const value = lines[lines.length - 2]; // ligne avant vide
+          // Nouvelle logique : prends la première ligne non vide après la première ligne vide
+          const blankLineIdx = lines.findIndex(l => l === '');
+          let value = '';
+          if (blankLineIdx !== -1 && lines.length > blankLineIdx + 1) {
+            value = lines[blankLineIdx + 1]?.trim() || '';
+          }
           formData[fieldName] = value;
         }
       }
@@ -54,7 +59,7 @@ exports.handler = async (event) => {
       console.log("Parsing JSON");
       formData = JSON.parse(event.body);
     }
-    console.log("Parsed form data:", formData);
+    console.log('Form data:', formData);
     // Gestion des champs en FR et fallback EN
     const nom = formData.firstName || formData.prenom || formData.nom || '';
     const prenom = formData.lastName || formData.prenom || '';
